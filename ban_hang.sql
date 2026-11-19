@@ -126,9 +126,7 @@ CREATE TABLE `ORDER` (
     `order_code` VARCHAR(50) NOT NULL UNIQUE,
     `table_id` INT NULL,
     `order_type` VARCHAR(50) NOT NULL,
-    `customer_name` VARCHAR(100) NULL,
-    `customer_phone` VARCHAR(20) NULL,
-    `discount_amount` DECIMAL(12,2) DEFAULT 0.00,
+	`discount_amount` DECIMAL(12,2) DEFAULT 0.00,
     `payment_method` INT NULL,
     `payment_status` VARCHAR(50) DEFAULT 'Chưa thanh toán',
     `total_amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
@@ -158,78 +156,3 @@ CREATE TABLE `ORDER_ITEMS` (
     CONSTRAINT `fk_order_items_variant` FOREIGN KEY (`variant_id`) REFERENCES `MENU_VARIANT` (`variant_id`) ON DELETE RESTRICT
 );
 
--- =============================================================================
--- 2. DỮ LIỆU MẪU THỰC TẾ (MOCK DATA)
--- =============================================================================
-
--- 1. Bàn ăn
-INSERT INTO `TABLES` (`table_id`, `table_number`, `qr_token`, `status`) VALUES
-(1, 'Bàn 01 (Tầng 1)', 'token_qr_ban_01_a912', 'Đang có khách'),
-(2, 'Bàn 02 (Tầng 1)', 'token_qr_ban_02_b841', 'Trống'),
-(3, 'Bàn VIP 01 (Tầng 2)', 'token_qr_ban_vip_9921', 'Đã đặt trước'),
-(4, 'Bàn Mang Về (Takeaway)', NULL, 'Khả dụng');
-
--- 2. Phương thức thanh toán
-INSERT INTO `PAYMENT_METHODS` (`PAYMENT_ID`, `Name`, `Status`) VALUES
-(1, 'Tiền mặt', 'Hoạt động'),
-(2, 'Chuyển khoản VietQR', 'Hoạt động'),
-(3, 'Ví điện tử MoMo', 'Hoạt động');
-
--- 3. Nhân viên
-INSERT INTO `STAFF` (`staff_id`, `full_name`, `email`, `password_hash`, `role`, `status`) VALUES
-(1, 'Nguyễn Văn Quản Lý', 'quanly@restaurant.com', '$2y$10$wT8Kz.hashManager99', 'Quản lý', 'Đang làm việc'),
-(2, 'Trần Thị Thu Ngân', 'thungan@restaurant.com', '$2y$10$kL9Qx.hashCashier88', 'Thu ngân', 'Đang làm việc'),
-(3, 'Lê Hoàng Phục Vụ', 'phucvu@restaurant.com', '$2y$10$mN3Za.hashWaiter77', 'Phục vụ', 'Đang làm việc');
-
--- 4. Voucher khuyến mãi
-INSERT INTO `VOUCHER` (`voucher_id`, `code`, `discount_percent`, `expiry_date`, `max_discount_amout`, `min_order_amount`, `status`, `voucher_sp_id`) VALUES
-(1, 'CHAOBANMOI', 10.00, '2026-12-31 23:59:59', 30000.00, 100000.00, 'Khả dụng', NULL),
-(2, 'GIAM50K', 20.00, '2026-12-31 23:59:59', 50000.00, 200000.00, 'Khả dụng', NULL);
-
--- 5. Danh mục món
-INSERT INTO `CATEGORY` (`category_id`, `category_name`, `description`, `status`) VALUES
-(1, 'Cà Phê Truyền Thống', 'Cà phê phin nguyên chất Robusta và Arabica', 'Hiển thị'),
-(2, 'Trà Trái Cây & Trà Sữa', 'Các món trà thanh nhiệt trái cây tươi mát', 'Hiển thị'),
-(3, 'Món Ăn Vặt', 'Đồ ăn kèm nóng hổi nhâm nhi', 'Hiển thị');
-
--- 6. Món ăn
-INSERT INTO `MENU_ITEM` (`item_id`, `item_name`, `description`, `status`, `image_url`, `options`, `category_id`) VALUES
-(1, 'Cà Phê Muối Xứ Huế', 'Cà phê phin đậm đặc kết hợp kem muối béo ngậy', 'Còn món', 'https://img.vn/cf-muoi.jpg', 'Ít ngọt, Ít đá, Nhiều đá', 1),
-(2, 'Trà Đào Cam Sả', 'Trà thanh đào kết hợp lát cam vàng và sả đập dập', 'Còn món', 'https://img.vn/tra-dao.jpg', '30% đường, 70% đường, 100% đường', 2),
-(3, 'Khoai Tây Chiên Lắc Phô Mai', 'Khoai tây cọng giòn rụm phủ bột phô mai béo thơm', 'Còn món', 'https://img.vn/khoai-tay.jpg', 'Có cay, Không cay', 3);
-
--- 7. Biến thể món ăn (Size/loại)
-INSERT INTO `MENU_VARIANT` (`variant_id`, `variant_name`, `discount`, `price`, `status`, `item_id`) VALUES
-(1, 'Size Vừa (M)', 0.00, 32000.00, 'Đang bán', 1),
-(2, 'Size Lớn (L)', 0.00, 39000.00, 'Đang bán', 1),
-(3, 'Size Vừa (M)', 0.00, 45000.00, 'Đang bán', 2),
-(4, 'Size Lớn (L)', 0.00, 52000.00, 'Đang bán', 2),
-(5, 'Phần Tiêu Chuẩn', 0.00, 35000.00, 'Đang bán', 3);
-
--- 8. Combo khuyến mãi
-INSERT INTO `PROMOTIONS_COMBO` (`combo_id`, `combo_name`, `date_start`, `date_end`) VALUES
-(1, 'Combo Trà Chiều Thư Giãn', '2026-01-01', '2026-12-31'),
-(2, 'Combo Ăn Vặt Cuối Tuần', '2026-01-01', '2026-06-30');
-
--- 9. Chi tiết khuyến mãi
-INSERT INTO `PROMOTIONS` (`promo_id`, `combo_id`, `variant_id`, `promo_type`, `promo_value`) VALUES
-(1, 1, 3, 'Giảm giá trực tiếp', 10000.00), -- Giảm 10k cho Trà Đào (M)
-(2, 2, 5, 'Phần trăm', 15.00);            -- Giảm 15% cho Khoai tây
-
--- 10. Đơn hàng (ORDER)
-INSERT INTO `ORDER` (`order_id`, `order_code`, `table_id`, `order_type`, `customer_name`, `customer_phone`, `discount_amount`, `payment_method`, `payment_status`, `total_amount`, `cancel_reason`, `voucher_id`, `status`, `staff_id`) VALUES
--- Đơn 1: Khách ngồi tại Bàn 1, mua 3 món (Gốc 126k, Voucher giảm 10% = 12.6k, Thực trả = 113.4k)
-(1, 'ORD-20261025-001', 1, 'Tại bàn', 'Anh Hoàng Nam', '0912345678', 12600.00, 2, 'Đã thanh toán', 113400.00, NULL, 1, 'Hoàn thành', 2),
-
--- Đơn 2: Khách mang về mua 1 ly Trà đào (45k)
-(2, 'ORD-20261025-002', 4, 'Mang về', 'Chị Mai Linh', '0987654321', 0.00, 1, 'Chưa thanh toán', 45000.00, NULL, NULL, 'Đang pha chế', 3);
-
--- 11. Chi tiết đơn hàng (ORDER_ITEMS - Khớp chuẩn variant_id)
-INSERT INTO `ORDER_ITEMS` (`order_item_id`, `order_id`, `variant_id`, `quantity`, `unit_price`, `discount_amount`, `note`, `subtotal`) VALUES
--- 3 món của Đơn 1:
-(1, 1, 4, 1, 52000.00, 0.00, '50% đường', 52000.00),           -- Trà đào Size L
-(2, 1, 2, 1, 39000.00, 0.00, 'Nhiều đá để riêng', 39000.00),   -- Cà phê muối Size L
-(3, 1, 5, 1, 35000.00, 0.00, 'Lắc nhiều phô mai', 35000.00),   -- Khoai tây chiên
-
--- 1 món của Đơn 2:
-(4, 2, 3, 1, 45000.00, 0.00, 'Mang về để đá riêng', 45000.00); -- Trà đào Size M
