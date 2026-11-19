@@ -280,3 +280,83 @@ INSERT INTO `ORDER_ITEMS` (`order_item_id`, `order_id`, `variant_id`, `quantity`
 (12, 5, 9, 2, 55000.00, 0.00, 'Lắc phô mai đậm đà', 11000.00),    -- 2x Khoai khổng lồ (110k)
 (13, 5, 6, 1, 40000.00, 0.00, 'Ít đường', 40000.00);               -- 1x Trà sữa M (40k)
 -- Tổng = 104 + 78 + 96 + 110 + 48 (trừ voucher 50k) = 386.000đ
+
+
+INSERT INTO `PROMOTIONS_COMBO` (`combo_id`, `combo_name`, `date_start`, `date_end`) 
+VALUES (10, 'Mua Trà Đào Giảm 50% Cà Phê Muối', '2026-01-01', '2026-12-31');
+
+-- Bước 2: Cấu hình 2 món vào bảng PROMOTIONS
+INSERT INTO `PROMOTIONS` (`promo_id`, `combo_id`, `variant_id`, `promo_type`, `promo_value`) VALUES
+-- 1. Ly B (Trà đào size M - variant_id = 3): Là món BẮT BUỘC PHẢI MUA (Số lượng 1)
+(101, 10, 3, 'DIEU_KIEN', 1.00),
+
+-- 2. Ly A (Cà phê muối size M - variant_id = 1): Là món ĐƯỢC GIẢM 50%
+(102, 10, 1, 'GIAM_PHAN_TRAM', 50.00);
+
+
+
+
+SELECT 
+    c.category_name AS 'Danh mục',
+    mi.item_id AS 'Mã món',
+    mi.item_name AS 'Tên món',
+    mi.description AS 'Mô tả',
+    mi.options AS 'Tùy chọn (Đá/Đường)',
+    mi.status AS 'Trạng thái món',
+    mv.variant_id AS 'Mã biến thể',
+    mv.variant_name AS 'Size / Loại',
+    mv.price AS 'Giá gốc',
+    mv.discount AS 'Giảm giá menu',
+    (mv.price - mv.discount) AS 'Giá bán thực tế',
+    mv.status AS 'Trạng thái bán'
+FROM `MENU_ITEM` mi
+JOIN `CATEGORY` c ON mi.category_id = c.category_id
+JOIN `MENU_VARIANT` mv ON mi.item_id = mv.item_id
+ORDER BY c.category_id ASC, mi.item_id ASC, mv.price ASC;
+
+
+SELECT 
+    pc.combo_id AS 'Mã Combo',
+    pc.combo_name AS 'Tên Combo',
+    pc.date_start AS 'Ngày bắt đầu',
+    pc.date_end AS 'Ngày kết thúc',
+    -- Tự động kiểm tra hạn sử dụng so với ngày hiện tại
+    CASE 
+        WHEN CURRENT_DATE < pc.date_start THEN 'Sắp diễn ra'
+        WHEN pc.date_end IS NOT NULL AND CURRENT_DATE > pc.date_end THEN 'Đã hết hạn'
+        ELSE 'Đang hoạt động'
+    END AS 'Trạng thái Combo',
+    mi.item_name AS 'Món áp dụng',
+    mv.variant_name AS 'Size / Loại',
+    mv.price AS 'Giá gốc món',
+    p.promo_type AS 'Loại ưu đãi (Điều kiện / Giảm giá)',
+    p.promo_value AS 'Giá trị ưu đãi',
+    -- Tính nhẩm số tiền được giảm tương ứng
+    CASE 
+        WHEN p.promo_type = 'Giảm giá trực tiếp' THEN CONCAT('-', FORMAT(p.promo_value, 0), ' đ')
+        WHEN p.promo_type = 'Phần trăm' OR p.promo_type = 'GIAM_PHAN_TRAM' THEN CONCAT('Giảm ', p.promo_value, '%')
+        WHEN p.promo_type = 'DIEU_KIEN' THEN 'Món mồi (Mua tối thiểu 1 ly)'
+        ELSE CONCAT(p.promo_value)
+    END AS 'Chi tiết ưu đãi'
+FROM `PROMOTIONS_COMBO` pc
+JOIN `PROMOTIONS` p ON pc.combo_id = p.combo_id
+JOIN `MENU_VARIANT` mv ON p.variant_id = mv.variant_id
+JOIN `MENU_ITEM` mi ON mv.item_id = mi.item_id
+ORDER BY pc.combo_id ASC, p.promo_id ASC;
+
+
+SELECT 
+    mi.item_id,
+    mi.item_name,
+    c.category_name,
+    JSON_ARRAYAGG(
+        JSON_OBJECT(
+            'variant_id', mv.variant_id,
+            'size', mv.variant_name,
+            'price', mv.price
+        )
+    ) AS variants
+FROM `MENU_ITEM` mi
+JOIN `CATEGORY` c ON mi.category_id = c.category_id
+JOIN `MENU_VARIANT` mv ON mi.item_id = mv.item_id
+GROUP BY mi.item_id, mi.item_name, c.category_name;
