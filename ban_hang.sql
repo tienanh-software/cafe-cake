@@ -360,3 +360,44 @@ FROM `MENU_ITEM` mi
 JOIN `CATEGORY` c ON mi.category_id = c.category_id
 JOIN `MENU_VARIANT` mv ON mi.item_id = mv.item_id
 GROUP BY mi.item_id, mi.item_name, c.category_name;
+
+
+SELECT 
+    pc.combo_id,
+    pc.combo_name,
+    pc.date_start,
+    pc.date_end,
+    mi.item_id,
+    mi.item_name,
+    mv.variant_id,
+    mv.variant_name,
+    mv.price AS original_price,
+    p.promo_type,
+    p.promo_value,
+    
+    CASE 
+        WHEN p.promo_type = 'Giảm giá trực tiếp' THEN (mv.price - p.promo_value)
+        WHEN p.promo_type = 'Phần trăm' OR p.promo_type = 'GIAM_PHAN_TRAM' THEN (mv.price * (1 - p.promo_value / 100))
+        ELSE mv.price 
+    END AS promo_price
+FROM `PROMOTIONS_COMBO` pc
+JOIN `PROMOTIONS` p ON pc.combo_id = p.combo_id
+JOIN `MENU_VARIANT` mv ON p.variant_id = mv.variant_id
+JOIN `MENU_ITEM` mi ON mv.item_id = mi.item_id
+WHERE mi.item_id = 3 -- THAY ITEM_ID 
+  AND CURRENT_DATE BETWEEN pc.date_start AND IFNULL(pc.date_end, '9999-12-31') -- Chỉ lấy combo còn hạn
+ORDER BY pc.combo_id DESC;
+
+SELECT DISTINCT
+    pc.combo_id,
+    pc.combo_name,
+    pc.date_start,
+    pc.date_end,
+    mi.item_name AS 'Món tìm thấy',
+    mv.variant_name AS 'Size'
+FROM `PROMOTIONS_COMBO` pc
+JOIN `PROMOTIONS` p ON pc.combo_id = p.combo_id
+JOIN `MENU_VARIANT` mv ON p.variant_id = mv.variant_id
+JOIN `MENU_ITEM` mi ON mv.item_id = mi.item_id
+WHERE mi.item_name LIKE CONCAT('%', 'Trà Đào', '%') --  TỪ KHÓA TÊN MÓNV
+  AND CURRENT_DATE BETWEEN pc.date_start AND IFNULL(pc.date_end, '9999-12-31');
