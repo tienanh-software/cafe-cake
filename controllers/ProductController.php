@@ -1,46 +1,112 @@
 <?php
+declare(strict_types=1);
+
 require_once "models/Products.php";
 
 class ProductController {
-    private $productModel;
+    private Products $productModel;
 
     public function __construct() {
         $this->productModel = new Products();
     }
 
-    private function mapProductData($item) {
-        $name = $item['item_name'] ?? $item['name'] ?? 'Chưa đặt tên';
-        $image = !empty($item['image_url']) ? $item['image_url'] : (!empty($item['image']) ? $item['image'] : 'https://images.unsplash.com/photo-1541167760496-1628856ab772?q=80&w=400&auto=format&fit=crop');
+    /**
+     * Chuẩn hóa dữ liệu tương thích ngược cho cả Views cũ và mới
+     */
+    private function mapProductData(array $item): array {
+        $name = $item['item_name'] ?? $item['name'] ?? 'Món chưa đặt tên';
+        $image = !empty($item['image_url']) 
+            ? $item['image_url'] 
+            : (!empty($item['image']) 
+                ? $item['image'] 
+                : 'https://images.unsplash.com/photo-1541167760496-1628856ab772?q=80&w=400&auto=format&fit=crop');
+
+        $minPrice = (float)($item['min_price'] ?? $item['price'] ?? 0);
+        $maxPrice = (float)($item['max_price'] ?? $minPrice);
+
         return [
-            'id' => $item['item_id'] ?? $item['id'] ?? 0,
-            'item_id'  => $item['item_id'] ?? $item['id'] ?? 0,
-            'name'  => $name,
-            'item_name'  => $name,
-            'price'  => $item['min_price'] ?? 0,
-            'min_price'  => $item['min_price'] ?? 0,
-            'image'  => $image,
-            'image_url'  => $image,
-            'description'  => $item['description'] ?? '',
-            'category_name' => $item['category_name'] ?? ''
+            // Cặp ID
+            'id'                 => (int)($item['item_id'] ?? $item['id'] ?? 0),
+            'item_id'            => (int)($item['item_id'] ?? $item['id'] ?? 0),
+            
+            // Cặp Tên
+            'name'               => $name,
+            'item_name'          => $name,
+            
+            // Cặp Giá
+            'price'              => $minPrice,
+            'min_price'          => $minPrice,
+            'max_price'          => $maxPrice,
+            'original_max_price' => (float)($item['original_max_price'] ?? $maxPrice),
+            'max_discount'       => (float)($item['max_discount'] ?? 0),
+            
+            // Hình ảnh & Thông tin chi tiết
+            'image'              => $image,
+            'image_url'          => $image,
+            'description'        => $item['description'] ?? '',
+            'options'            => $item['options'] ?? '',
+            'options_list'       => $item['options_list'] ?? [],
+            'category_name'      => $item['category_name'] ?? 'Babo Menu',
+            
+            // Biến thể & Khuyến mãi (nếu có)
+            'variants'           => $item['variants'] ?? [],
+            'active_combos'      => $item['active_combos'] ?? []
         ];
     }
 
-    public function index() {
-        $rawItems = $this->productModel->getAll();
-        
-        $products = [];
-        foreach ($rawItems as $item) {
-            $products[] = $this->mapProductData($item);
+    /**
+     * Trang chủ hiển thị: Món Mới, Khuyến Mãi và Bán Chạy Nhất từ Database
+     */
+ public function index(): void {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
         }
 
-        $newProducts = array_slice($products, 0, 4);
-        $promoProducts = array_slice($products, 0, 4);
-        $bestsellers = array_slice($products, 0, 4);
+        // 1. TRƯỜNG HỢP QUÉT QR TẠI BÀN (Có mã Token an toàn)
+        if (isset($_GET['token'])) {
+            $token = trim($_GET['token']);
+            // Truy vấn kiểm tra token có tồn tại trong bảng TABLES không
+            $table = $this->productModel->getTableByToken($token);
+
+            if ($table) {
+                $_SESSION['order_context'] = [
+                    'type'         => 'Tại bàn',
+                    'table_id'     => $table['table_id'],
+                    'table_number' => $table['table_number']
+                ];
+            }
+        } 
+        // 2. TRƯỜNG HỢP QUÉT QR MANG VỀ (Takeaway)
+        elseif (isset($_GET['mode']) && $_GET['mode'] === 'takeaway') {
+            $_SESSION['order_context'] = [
+                'type'         => 'Mang về',
+                'table_id'     => null,
+                'table_number' => 'Mang về (Take-away)'
+            ];
+        }
+
+        // 3. MẶC ĐỊNH (Nếu vào trực tiếp mà chưa có Session -> Gán tạm Bàn 01 để test)
+        if (!isset($_SESSION['order_context'])) {
+            $_SESSION['order_context'] = [
+                'type'         => 'Tại bàn',
+                'table_id'     => 1,
+                'table_number' => 'Bàn 01 (Demo)'
+            ];
+        }
+
+        // Lấy danh sách món hiển thị như bình thường...
+        $rawNew = $this->productModel->getAll();
+        $newProducts = array_map([$this, 'mapProductData'], array_slice($rawNew, 0, 8));
+        $promoProducts = array_map([$this, 'mapProductData'], $this->productModel->getDiscountedProducts(6));
+        $bestsellers = array_map([$this, 'mapProductData'], $this->productModel->getBestSellers(6));
 
         require_once "views/home.php";
     }
 
-    public function detail() {
+    /**
+     * Xem chi tiết món ăn (Kèm danh sách biến thể Size, Tùy chọn)
+     */
+    public function detail(): void {
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if ($id <= 0) {
             header("Location: index.php");
@@ -54,8 +120,10 @@ class ProductController {
         }
 
         $product = $this->mapProductData($rawItem);
-        $variants = $this->productModel->getVariantsByItemId($id);
-        $toppings = $this->productModel->getToppingsByItemId($id);
+        $variants = !empty($product['variants']) 
+            ? $product['variants'] 
+            : $this->productModel->getVariantsByItemId($id);
+ 
 
         if (file_exists("views/detail.php")) {
             require_once "views/detail.php";
@@ -64,37 +132,45 @@ class ProductController {
         }
     }
 
-    public function filterByCategory() {
+    /**
+     * Lọc món ăn theo danh mục
+     */
+    public function filterByCategory(): void {
         $categoryId = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0;
+        
+        if ($categoryId <= 0) {
+            header("Location: index.php");
+            exit;
+        }
+
         $rawItems = $this->productModel->getByCategory($categoryId);
-
-        $products = [];
-        foreach ($rawItems as $item) {
-            $products[] = $this->mapProductData($item);
-        }
-
-        $newProducts = $products;
+        $newProducts = array_map([$this, 'mapProductData'], $rawItems);
+        
+        // Khi lọc danh mục thì ẩn 2 khối ưu đãi và bán chạy
         $promoProducts = [];
         $bestsellers = [];
 
         require_once "views/home.php";
     }
 
-    public function search() {
-        $keyword = isset($_GET['keyword']) ? trim($_GET['keyword']) : '';
+    /**
+     * Tìm kiếm món ăn theo từ khóa
+     */
+    public function search(): void {
+        $keyword = isset($_GET['keyword']) ? trim((string)$_GET['keyword']) : '';
+
+        if ($keyword === '') {
+            $this->index();
+            return;
+        }
+
         $rawItems = $this->productModel->search($keyword);
+        $newProducts = array_map([$this, 'mapProductData'], $rawItems);
 
-        $products = [];
-        foreach ($rawItems as $item) {
-            $products[] = $this->mapProductData($item);
-        }
-
-        $newProducts = $products;
+        // Khi tìm kiếm thì chỉ hiển thị kết quả tìm được
         $promoProducts = [];
         $bestsellers = [];
 
         require_once "views/home.php";
     }
-    
 }
-?>

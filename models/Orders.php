@@ -13,6 +13,37 @@ class Orders extends DB {
     // =========================================================================
 
     /**
+     * Tìm đơn hàng đang hoạt động (chưa hoàn thành) của bàn
+     */
+    public function getActiveOrderByTable(int $tableId): ?array {
+        $sql = "SELECT order_id, order_code, total_amount, status, created_at 
+                FROM `ORDER` 
+                WHERE table_id = :table_id 
+                  AND status IN ('Chờ xử lý', 'Đang chuẩn bị')
+                ORDER BY order_id DESC 
+                LIMIT 1";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':table_id' => $tableId]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$order) {
+            return null;
+        }
+
+        // Lấy chi tiết các món trong đơn này kèm tiến độ
+        $sqlItems = "SELECT oi.*, mi.item_name, mv.variant_name 
+                     FROM `ORDER_ITEMS` oi
+                     JOIN `MENU_VARIANT` mv ON oi.variant_id = mv.variant_id
+                     JOIN `MENU_ITEM` mi ON mv.item_id = mi.item_id
+                     WHERE oi.order_id = :order_id";
+        $stmtItems = $this->conn->prepare($sqlItems);
+        $stmtItems->execute([':order_id' => $order['order_id']]);
+        $order['items'] = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
+
+        return $order;
+    }
+    /**
      * Tạo đơn hàng với Transaction an toàn 100%
      */
     public function createOrder($orderData, $cartItems) {

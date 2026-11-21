@@ -5,7 +5,7 @@ class DB {
     public function __construct() {
         $host = "localhost";
         $port = "3306"; 
-        $dbname = "cafe_qr_ordering";
+        $dbname = "restaurant_db";
         $username = "root";
         $password = "013234656798ntaA@"; 
 
